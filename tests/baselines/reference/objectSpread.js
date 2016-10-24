@@ -39,9 +39,9 @@ getter.a = 12;
 let spreadNull = { ...null };
 let spreadUndefind = { ...undefined };
 let spreadNum = { ...12 };
-let spreadStr = { ...'foo' };
 let spreadBool = { ...false };
 let spreadFunc = { ...(function () { }) };
+let spreadStr = { ...'foo' };
 
 // methods are not enumerable
 class C { p = 1; m() { } }
@@ -81,8 +81,8 @@ let a = 12;
 let shortCutted: { a: number, b: string } = { ...o, a }
 
 // generics
-function f<T, U>(t: T, u: U): { id: string, ...T, ...U } {
-    return { id: 'id', ...t, ...u };
+function f<T, U>(t: T, u: U): { ...T, ...U, id: string } {
+    return { ...t, ...u, id: 'id' };
 }
 let exclusive: { id: string, a: number, b: string, c: string, d: boolean } =
     f({ a: 1, b: 'yes' }, { c: 'no', d: false })
@@ -90,7 +90,7 @@ let overlap: { id: string, a: number, b: string } =
     f({ a: 1 }, { a: 2, b: 'extra' })
 let overlapConflict: { id:string, a: string } =
     f({ a: 1 }, { a: 'mismatch' })
-let overwriteId: { id: boolean, a: number, c: number, d: string } =
+let overwriteId: { id: string, a: number, c: number, d: string } =
     f({ a: 1, id: true }, { c: 1, d: 'no' })
 
 class D { m() { }; q = 2; }
@@ -132,9 +132,9 @@ getter.a = 12;
 var spreadNull = __assign({}, null);
 var spreadUndefind = __assign({}, undefined);
 var spreadNum = __assign({}, 12);
-var spreadStr = __assign({}, 'foo');
 var spreadBool = __assign({}, false);
 var spreadFunc = __assign({}, (function () { }));
+var spreadStr = __assign({}, 'foo');
 // methods are not enumerable
 var C = (function () {
     function C() {
@@ -169,7 +169,7 @@ var a = 12;
 var shortCutted = __assign({}, o, { a: a });
 // generics
 function f(t, u) {
-    return __assign({ id: 'id' }, t, u);
+    return __assign({}, t, u, { id: 'id' });
 }
 var exclusive = f({ a: 1, b: 'yes' }, { c: 'no', d: false });
 var overlap = f({ a: 1 }, { a: 2, b: 'extra' });

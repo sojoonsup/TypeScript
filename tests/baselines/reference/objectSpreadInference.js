@@ -12,6 +12,7 @@ function generic<W, X, Y>(w: W, x: X, y: Y) {
 }
 let b: { b: number };
 let c: { c: number };
+<<<<<<< HEAD
 // should infer { t: {}, u: { b: number, c: number }, v: number }
 let i1 = infer({ ...b, ...c, a: 12 });
 // should infer { t: { a: number, b: number, c: number }, u: {}, v: {} }
@@ -58,6 +59,14 @@ interface I {
 }
 let i: I;
 let result5 = removeIndexSignature(i);
+=======
+// can only infer { t: {}, u: {}, v: {} }
+let i1 = infer({ ...b, ...c, a: 12 });
+// can only infer { t: {}, u: {}, v: {} }
+let i2 = infer2({ ...b, ...c, a: 12 });
+// can only infer { t: {}, u: {}, v: {} }
+let i3 = generic(b, c, { a: 12 });
+>>>>>>> object-spread
 
 
 //// [objectSpreadInference.js]
@@ -75,6 +84,7 @@ function generic(w, x, y) {
 }
 var b;
 var c;
+<<<<<<< HEAD
 // should infer { t: {}, u: { b: number, c: number }, v: number }
 var i1 = infer(__assign({}, b, c, { a: 12 }));
 // should infer { t: { a: number, b: number, c: number }, u: {}, v: {} }
@@ -109,3 +119,11 @@ result4.method();
 result4.a;
 var i;
 var result5 = removeIndexSignature(i);
+=======
+// can only infer { t: {}, u: {}, v: {} }
+var i1 = infer(__assign({}, b, c, { a: 12 }));
+// can only infer { t: {}, u: {}, v: {} }
+var i2 = infer2(__assign({}, b, c, { a: 12 }));
+// can only infer { t: {}, u: {}, v: {} }
+var i3 = generic(b, c, { a: 12 });
+>>>>>>> object-spread
