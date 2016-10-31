@@ -13,7 +13,7 @@ var __rest = (this && this.__rest) || function (s, e) {
     return t;
 };
 var o = { a: 1, b: 'no' };
-var ;
+var mustBeLast = o.mustBeLast, a = o.a;
 function stillMustBeLast(_a) {
     var mustBeLast = _a.mustBeLast, a = _a.a;
 }

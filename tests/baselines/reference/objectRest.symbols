@@ -50,17 +50,48 @@ var { d: renamed, ...d } = o2;
 >d : Symbol(d, Decl(objectRest.ts, 10, 17))
 >o2 : Symbol(o2, Decl(objectRest.ts, 9, 3))
 
-let complex: { x: { z, ka }, y: string };
->complex : Symbol(complex, Decl(objectRest.ts, 12, 3))
->x : Symbol(x, Decl(objectRest.ts, 12, 14))
->z : Symbol(z, Decl(objectRest.ts, 12, 19))
->ka : Symbol(ka, Decl(objectRest.ts, 12, 22))
->y : Symbol(y, Decl(objectRest.ts, 12, 28))
+let nestedrest: { x: number, n1: { y: number, n2: { z: number, n3: { n4: number } } }, rest: number, restrest: number };
+>nestedrest : Symbol(nestedrest, Decl(objectRest.ts, 12, 3))
+>x : Symbol(x, Decl(objectRest.ts, 12, 17))
+>n1 : Symbol(n1, Decl(objectRest.ts, 12, 28))
+>y : Symbol(y, Decl(objectRest.ts, 12, 34))
+>n2 : Symbol(n2, Decl(objectRest.ts, 12, 45))
+>z : Symbol(z, Decl(objectRest.ts, 12, 51))
+>n3 : Symbol(n3, Decl(objectRest.ts, 12, 62))
+>n4 : Symbol(n4, Decl(objectRest.ts, 12, 68))
+>rest : Symbol(rest, Decl(objectRest.ts, 12, 86))
+>restrest : Symbol(restrest, Decl(objectRest.ts, 12, 100))
 
-let { x: { z, ...nested }, ...rest } = complex;
->x : Symbol(x, Decl(objectRest.ts, 12, 14))
->z : Symbol(z, Decl(objectRest.ts, 13, 10))
->nested : Symbol(nested, Decl(objectRest.ts, 13, 13))
->rest : Symbol(rest, Decl(objectRest.ts, 13, 26))
->complex : Symbol(complex, Decl(objectRest.ts, 12, 3))
+var { x, n1: { y, n2: { z, n3: { ...nr } } }, ...restrest } = nestedrest;
+>x : Symbol(x, Decl(objectRest.ts, 13, 5))
+>n1 : Symbol(n1, Decl(objectRest.ts, 12, 28))
+>y : Symbol(y, Decl(objectRest.ts, 13, 14))
+>n2 : Symbol(n2, Decl(objectRest.ts, 12, 45))
+>z : Symbol(z, Decl(objectRest.ts, 13, 23))
+>n3 : Symbol(n3, Decl(objectRest.ts, 12, 62))
+>nr : Symbol(nr, Decl(objectRest.ts, 13, 32))
+>restrest : Symbol(restrest, Decl(objectRest.ts, 13, 45))
+>nestedrest : Symbol(nestedrest, Decl(objectRest.ts, 12, 3))
+
+let complex: { x: { ka, ki }, y: number };
+>complex : Symbol(complex, Decl(objectRest.ts, 15, 3))
+>x : Symbol(x, Decl(objectRest.ts, 15, 14))
+>ka : Symbol(ka, Decl(objectRest.ts, 15, 19))
+>ki : Symbol(ki, Decl(objectRest.ts, 15, 23))
+>y : Symbol(y, Decl(objectRest.ts, 15, 29))
+
+var { x: { ka, ...nested }, y: other, ...rest } = complex;
+>x : Symbol(x, Decl(objectRest.ts, 15, 14))
+>ka : Symbol(ka, Decl(objectRest.ts, 16, 10))
+>nested : Symbol(nested, Decl(objectRest.ts, 16, 14))
+>y : Symbol(y, Decl(objectRest.ts, 15, 29))
+>other : Symbol(other, Decl(objectRest.ts, 16, 27))
+>rest : Symbol(rest, Decl(objectRest.ts, 16, 37))
+>complex : Symbol(complex, Decl(objectRest.ts, 15, 3))
+
+({x: { ka, ...nested }, y, ...rest} = complex);
+>x : Symbol(x, Decl(objectRest.ts, 17, 2))
+>ka : Symbol(ka, Decl(objectRest.ts, 17, 6))
+>y : Symbol(y, Decl(objectRest.ts, 17, 23))
+>complex : Symbol(complex, Decl(objectRest.ts, 15, 3))
 

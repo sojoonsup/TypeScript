@@ -56,17 +56,54 @@ var { d: renamed, ...d } = o2;
 >d : { c: string; }
 >o2 : { c: string; d: string; }
 
-let complex: { x: { z, ka }, y: string };
->complex : { x: { z: any; ka: any; }; y: string; }
->x : { z: any; ka: any; }
->z : any
->ka : any
->y : string
+let nestedrest: { x: number, n1: { y: number, n2: { z: number, n3: { n4: number } } }, rest: number, restrest: number };
+>nestedrest : { x: number; n1: { y: number; n2: { z: number; n3: { n4: number; }; }; }; rest: number; restrest: number; }
+>x : number
+>n1 : { y: number; n2: { z: number; n3: { n4: number; }; }; }
+>y : number
+>n2 : { z: number; n3: { n4: number; }; }
+>z : number
+>n3 : { n4: number; }
+>n4 : number
+>rest : number
+>restrest : number
 
-let { x: { z, ...nested }, ...rest } = complex;
+var { x, n1: { y, n2: { z, n3: { ...nr } } }, ...restrest } = nestedrest;
+>x : number
+>n1 : any
+>y : number
+>n2 : any
+>z : number
+>n3 : any
+>nr : { n4: number; }
+>restrest : { rest: number; restrest: number; }
+>nestedrest : { x: number; n1: { y: number; n2: { z: number; n3: { n4: number; }; }; }; rest: number; restrest: number; }
+
+let complex: { x: { ka, ki }, y: number };
+>complex : { x: { ka: any; ki: any; }; y: number; }
+>x : { ka: any; ki: any; }
+>ka : any
+>ki : any
+>y : number
+
+var { x: { ka, ...nested }, y: other, ...rest } = complex;
 >x : any
->z : any
->nested : { ka: any; }
->rest : { y: string; }
->complex : { x: { z: any; ka: any; }; y: string; }
+>ka : any
+>nested : { ki: any; }
+>y : any
+>other : number
+>rest : {}
+>complex : { x: { ka: any; ki: any; }; y: number; }
+
+({x: { ka, ...nested }, y, ...rest} = complex);
+>({x: { ka, ...nested }, y, ...rest} = complex) : { x: { ka: any; ki: any; }; y: number; }
+>{x: { ka, ...nested }, y, ...rest} = complex : { x: { ka: any; ki: any; }; y: number; }
+>{x: { ka, ...nested }, y, ...rest} : { x: { ki: any; ka: any; }; y: number; }
+>x : { ki: any; ka: any; }
+>{ ka, ...nested } : { ki: any; ka: any; }
+>ka : any
+>nested : any
+>y : number
+>rest : any
+>complex : { x: { ka: any; ki: any; }; y: number; }
 
