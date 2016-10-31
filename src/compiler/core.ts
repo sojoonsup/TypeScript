@@ -41,6 +41,7 @@ namespace ts {
         return map;
     }
 
+    //this is just a map that converts keys.
     export function createFileMap<T>(keyMapper?: (key: string) => string): FileMap<T> {
         let files = createMap<T>();
         return {

@@ -11,6 +11,9 @@ namespace ts {
     // branded string type used to store absolute, normalized and canonicalized paths
     // arbitrary file name can be converted to Path via toPath function
     export type Path = string & { __pathBrand: any };
+    //todo
+    /* @internal */
+    export type RealPath = string & { __realPathBrand: any };
 
     export interface FileMap<T> {
         get(fileName: Path): T;
@@ -2031,7 +2034,7 @@ namespace ts {
         statements: NodeArray<Statement>;
         endOfFileToken: Token<SyntaxKind.EndOfFileToken>;
 
-        fileName: string;
+        fileName: string; //in case of multiple paths to this, should this be the realpath???
         /* internal */ path: Path;
         text: string;
 
@@ -2097,8 +2100,8 @@ namespace ts {
 
     export interface ScriptReferenceHost {
         getCompilerOptions(): CompilerOptions;
-        getSourceFile(fileName: string): SourceFile;
-        getSourceFileByPath(path: Path): SourceFile;
+        getSourceFile(fileName: string): SourceFile; //takes a logical path
+        getSourceFileByPath(path: Path): SourceFile; //takes a logical path
         getCurrentDirectory(): string;
     }
 
@@ -3409,6 +3412,7 @@ namespace ts {
     }
 
     export interface CompilerHost extends ModuleResolutionHost {
+        //fileName is a logical path
         getSourceFile(fileName: string, languageVersion: ScriptTarget, onError?: (message: string) => void): SourceFile;
         getSourceFileByPath?(fileName: string, path: Path, languageVersion: ScriptTarget, onError?: (message: string) => void): SourceFile;
         getCancellationToken?(): CancellationToken;

@@ -571,7 +571,7 @@ namespace ts {
     }
 
     function resolvedWithRealpath(resolved: Resolved, host: ModuleResolutionHost, traceEnabled: boolean): Resolved {
-        if (!host.realpath) {
+        if (!false) {//(!host.realpath) { //TODO: Kill this fn
             return resolved;
         }
 

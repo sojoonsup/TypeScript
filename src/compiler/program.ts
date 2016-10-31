@@ -24,6 +24,7 @@ namespace ts {
         return undefined;
     }
 
+    //need realpath here?
     export function resolveTripleslashReference(moduleName: string, containingFile: string): string {
         const basePath = getDirectoryPath(containingFile);
         const referencedFileName = isRootedDiskPath(moduleName) ? moduleName : combinePaths(basePath, moduleName);
@@ -93,6 +94,7 @@ namespace ts {
         // returned by CScript sys environment
         const unsupportedFileEncodingErrorCode = -2147024809;
 
+        //this can use logical path just fine
         function getSourceFile(fileName: string, languageVersion: ScriptTarget, onError?: (message: string) => void): SourceFile {
             let text: string;
             try {
@@ -355,6 +357,7 @@ namespace ts {
             resolveTypeReferenceDirectiveNamesWorker = (typeReferenceDirectiveNames, containingFile) => loadWithLocalCache(typeReferenceDirectiveNames, containingFile, loader);
         }
 
+        //Keys are *logical* paths. More than one key may point to the *same* value!
         const filesByName = createFileMap<SourceFile>();
         // stores 'filename -> file association' ignoring case
         // used to track cases when two file names differ only in casing
@@ -672,11 +675,11 @@ namespace ts {
             return emitResult;
         }
 
-        function getSourceFile(fileName: string): SourceFile {
+        function getSourceFile(fileName: string): SourceFile { //filename is logical
             return getSourceFileByPath(toPath(fileName, currentDirectory, getCanonicalFileName));
         }
 
-        function getSourceFileByPath(path: Path): SourceFile {
+        function getSourceFileByPath(path: Path): SourceFile { //path is logical
             return filesByName.get(path);
         }
 
@@ -1133,9 +1136,11 @@ namespace ts {
         }
 
         // Get source file from normalized fileName
+        //!!!
         function findSourceFile(fileName: string, path: Path, isDefaultLib: boolean, refFile?: SourceFile, refPos?: number, refEnd?: number): SourceFile {
-            if (filesByName.contains(path)) {
-                const file = filesByName.get(path);
+            const fileFromFiles = filesByName.get(path);
+            if (fileFromFiles) {
+                const file = fileFromFiles; //neater
                 // try to check if we've already seen this file but with a different casing in path
                 // NOTE: this only makes sense for case-insensitive file systems
                 if (file && options.forceConsistentCasingInFileNames && getNormalizedAbsolutePath(file.fileName, currentDirectory) !== getNormalizedAbsolutePath(fileName, currentDirectory)) {
