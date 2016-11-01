@@ -14,6 +14,6 @@ var { d: renamed, ...d } = o2;
 let nestedrest: { x: number, n1: { y: number, n2: { z: number, n3: { n4: number } } }, rest: number, restrest: number };
 var { x, n1: { y, n2: { z, n3: { ...nr } } }, ...restrest } = nestedrest;
 
-let complex: { x: { ka, ki }, y: string };
+let complex: { x: { ka, ki }, y: number };
 var { x: { ka, ...nested }, y: other, ...rest } = complex;
-//({x: { ka, ...nested }, y, ...rest} = complex);
+({x: { ka, ...nested }, y: other, ...rest} = complex);
