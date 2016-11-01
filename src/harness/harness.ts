@@ -981,7 +981,8 @@ namespace Harness {
                         const link = file.fileOptions["symlink"];
                         const linkPath = ts.toPath(link, currentDirectory, getCanonicalFileName);
                         realPathMap.set(linkPath, fileName);
-                        fileMap.set(path, (): ts.SourceFile => { throw new Error("Symlinks should always be resolved to a realpath first"); });
+                        //not true any more!!!
+                        //fileMap.set(path, (): ts.SourceFile => { throw new Error("Symlinks should always be resolved to a realpath first"); });
                     }
                     const sourceFile = createSourceFileAndAssertInvariants(fileName, file.content, scriptTarget);
                     fileMap.set(path, () => sourceFile);
@@ -990,8 +991,8 @@ namespace Harness {
 
             function getSourceFile(fileName: string) {
                 fileName = ts.normalizePath(fileName);
-                const path = ts.toPath(fileName, currentDirectory, getCanonicalFileName);
-                if (fileMap.contains(path)) {
+                const path = realPath(ts.toPath(fileName, currentDirectory, getCanonicalFileName));
+                if (fileMap.contains(path)) { //Don't lookup twice...
                     return fileMap.get(path)();
                 }
                 else if (fileName === fourslashFileName) {
@@ -1012,6 +1013,12 @@ namespace Harness {
                         Harness.IO.newLine();
 
 
+            //move
+            function realPath(f: ts.Path): ts.Path {
+                const path = ts.toPath(f, currentDirectory, getCanonicalFileName);
+                return (realPathMap.get(path) as ts.Path) || path;
+            }
+
             return {
                 getCurrentDirectory: () => currentDirectory,
                 getSourceFile,
@@ -1025,12 +1032,12 @@ namespace Harness {
                     return fileMap.contains(path) || (realPathMap && realPathMap.contains(path));
                 },
                 readFile: (fileName: string): string => {
-                    return fileMap.get(ts.toPath(fileName, currentDirectory, getCanonicalFileName))().getText();
+                    const path = ts.toPath(fileName, currentDirectory, getCanonicalFileName);
+                    const real = realPathMap ? realPath(path) : path;
+                    //TODO: don't need to use a fn any more, can just store result directly
+                    return fileMap.get(real)().getText();
                 },
-                realpath: realPathMap && ((f: string) => {
-                    const path = ts.toPath(f, currentDirectory, getCanonicalFileName);
-                    return realPathMap.get(path) || path;
-                }),
+                realpath: realPathMap && realPath,
                 directoryExists: dir => {
                     let path = ts.toPath(dir, currentDirectory, getCanonicalFileName);
                     // Strip trailing /, which may exist if the path is a drive root
@@ -1053,6 +1060,7 @@ namespace Harness {
                             }
                         }
                     });
+                    if (!false) throw new Error("TODO: Is this used?");
                     return result;
                 }
             };
@@ -1212,7 +1220,9 @@ namespace Harness {
 
             const compilerHost = createCompilerHost(
                 programFiles.concat(otherFiles),
-                (fileName, code, writeByteOrderMark) => fileOutputs.push({ fileName, code, writeByteOrderMark }),
+                (fileName, code, writeByteOrderMark) => {
+                    fileOutputs.push({ fileName, code, writeByteOrderMark })
+                },
                 options.target,
                 useCaseSensitiveFileNames,
                 currentDirectory,

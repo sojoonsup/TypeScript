@@ -24,6 +24,7 @@ namespace ts {
         forEachValue(f: (key: Path, v: T) => void): void;
         getKeys(): Path[];
         clear(): void;
+        files: Map<T> //kill
     }
 
     export interface TextRange {
@@ -2035,7 +2036,7 @@ namespace ts {
         endOfFileToken: Token<SyntaxKind.EndOfFileToken>;
 
         fileName: string; //in case of multiple paths to this, should this be the realpath???
-        /* internal */ path: Path;
+        /* internal */ path: Path; //I made this the realpath, should I have??? Make this of the RealPath type.
         text: string;
 
         amdDependencies: AmdDependency[];
@@ -2120,6 +2121,7 @@ namespace ts {
     }
 
     export interface WriteFileCallback {
+        //why is this given sourceFiles as input?
         (fileName: string, data: string, writeByteOrderMark: boolean, onError?: (message: string) => void, sourceFiles?: SourceFile[]): void;
     }
 

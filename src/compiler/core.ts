@@ -52,6 +52,7 @@ namespace ts {
             forEachValue: forEachValueInMap,
             getKeys,
             clear,
+            files, //kill -- this is just for debugging
         };
 
         function forEachValueInMap(f: (key: Path, value: T) => void) {

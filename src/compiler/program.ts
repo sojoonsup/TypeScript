@@ -166,6 +166,7 @@ namespace ts {
             };
         }
 
+        //this ignores the sourceFiles parameter...
         function writeFile(fileName: string, data: string, writeByteOrderMark: boolean, onError?: (message: string) => void) {
             try {
                 performance.mark("beforeIOWrite");
@@ -357,7 +358,7 @@ namespace ts {
             resolveTypeReferenceDirectiveNamesWorker = (typeReferenceDirectiveNames, containingFile) => loadWithLocalCache(typeReferenceDirectiveNames, containingFile, loader);
         }
 
-        //Keys are *logical* paths. More than one key may point to the *same* value!
+        //Keys must be real paths!!!
         const filesByName = createFileMap<SourceFile>();
         // stores 'filename -> file association' ignoring case
         // used to track cases when two file names differ only in casing
@@ -680,7 +681,12 @@ namespace ts {
         }
 
         function getSourceFileByPath(path: Path): SourceFile { //path is logical
-            return filesByName.get(path);
+            return filesByName.get(realpath(path));
+        }
+
+        //neater
+        function realpath(path: Path): Path {
+            return host.realpath ? (host.realpath(path) as Path) : path;
         }
 
         function getDiagnosticsHelper(
@@ -1091,7 +1097,7 @@ namespace ts {
                     diagnostic = Diagnostics.File_0_has_unsupported_extension_The_only_supported_extensions_are_1;
                     diagnosticArgument = [fileName, "'" + supportedExtensions.join("', '") + "'"];
                 }
-                else if (!findSourceFile(fileName, toPath(fileName, currentDirectory, getCanonicalFileName), isDefaultLib, refFile, refPos, refEnd)) {
+                else if (!findMeASourceFile(fileName)) {
                     diagnostic = Diagnostics.File_0_not_found;
                     diagnosticArgument = [fileName];
                 }
@@ -1101,13 +1107,14 @@ namespace ts {
                 }
             }
             else {
-                const nonTsFile: SourceFile = options.allowNonTsExtensions && findSourceFile(fileName, toPath(fileName, currentDirectory, getCanonicalFileName), isDefaultLib, refFile, refPos, refEnd);
+                const nonTsFile: SourceFile = options.allowNonTsExtensions && findMeASourceFile(fileName);
                 if (!nonTsFile) {
                     if (options.allowNonTsExtensions) {
                         diagnostic = Diagnostics.File_0_not_found;
                         diagnosticArgument = [fileName];
                     }
-                    else if (!forEach(supportedExtensions, extension => findSourceFile(fileName + extension, toPath(fileName + extension, currentDirectory, getCanonicalFileName), isDefaultLib, refFile, refPos, refEnd))) {
+                    //This is duplicating module resolution...
+                    else if (!forEach(supportedExtensions, extension => findMeASourceFile(fileName + extension))) {
                         diagnostic = Diagnostics.File_0_not_found;
                         fileName += ".ts";
                         diagnosticArgument = [fileName];
@@ -1123,6 +1130,10 @@ namespace ts {
                     fileProcessingDiagnostics.add(createCompilerDiagnostic(diagnostic, ...diagnosticArgument));
                 }
             }
+
+            function findMeASourceFile(name: string) { //name
+                return findSourceFile(name, currentDirectory, getCanonicalFileName, isDefaultLib, refFile, refPos, refEnd);
+            }
         }
 
         function reportFileNamesDifferOnlyInCasingError(fileName: string, existingFileName: string, refFile: SourceFile, refPos: number, refEnd: number): void {
@@ -1135,39 +1146,90 @@ namespace ts {
             }
         }
 
-        // Get source file from normalized fileName
-        //!!!
-        function findSourceFile(fileName: string, path: Path, isDefaultLib: boolean, refFile?: SourceFile, refPos?: number, refEnd?: number): SourceFile {
-            const fileFromFiles = filesByName.get(path);
-            if (fileFromFiles) {
-                const file = fileFromFiles; //neater
-                // try to check if we've already seen this file but with a different casing in path
-                // NOTE: this only makes sense for case-insensitive file systems
-                if (file && options.forceConsistentCasingInFileNames && getNormalizedAbsolutePath(file.fileName, currentDirectory) !== getNormalizedAbsolutePath(fileName, currentDirectory)) {
-                    reportFileNamesDifferOnlyInCasingError(fileName, file.fileName, refFile, refPos, refEnd);
+        //name, move below findSourceFile
+        function foo(file: SourceFile, fileName: string, isDefaultLib: boolean, refFile?: SourceFile, refPos?: number, refEnd?: number) {
+            // try to check if we've already seen this file but with a different casing in path
+            // NOTE: this only makes sense for case-insensitive file systems
+            if (file && options.forceConsistentCasingInFileNames && getNormalizedAbsolutePath(file.fileName, currentDirectory) !== getNormalizedAbsolutePath(fileName, currentDirectory)) {
+                reportFileNamesDifferOnlyInCasingError(fileName, file.fileName, refFile, refPos, refEnd);
+            }
+
+            // If the file was previously found via a node_modules search, but is now being processed as a root file,
+            // then everything it sucks in may also be marked incorrectly, and needs to be checked again.
+            if (file && sourceFilesFoundSearchingNodeModules[file.path] && currentNodeModulesDepth == 0) {
+                sourceFilesFoundSearchingNodeModules[file.path] = false;
+                if (!options.noResolve) {
+                    processReferencedFiles(file, isDefaultLib);
+                    processTypeReferenceDirectives(file);
                 }
 
-                // If the file was previously found via a node_modules search, but is now being processed as a root file,
-                // then everything it sucks in may also be marked incorrectly, and needs to be checked again.
-                if (file && sourceFilesFoundSearchingNodeModules[file.path] && currentNodeModulesDepth == 0) {
-                    sourceFilesFoundSearchingNodeModules[file.path] = false;
-                    if (!options.noResolve) {
-                        processReferencedFiles(file, isDefaultLib);
-                        processTypeReferenceDirectives(file);
-                    }
-
+                modulesWithElidedImports[file.path] = false;
+                processImportedModules(file);
+            }
+            // See if we need to reprocess the imports due to prior skipped imports
+            else if (file && modulesWithElidedImports[file.path]) {
+                if (currentNodeModulesDepth < maxNodeModuleJsDepth) {
                     modulesWithElidedImports[file.path] = false;
                     processImportedModules(file);
                 }
-                // See if we need to reprocess the imports due to prior skipped imports
-                else if (file && modulesWithElidedImports[file.path]) {
-                    if (currentNodeModulesDepth < maxNodeModuleJsDepth) {
-                        modulesWithElidedImports[file.path] = false;
-                        processImportedModules(file);
-                    }
-                }
+            }
 
-                return file;
+            return file;
+        }
+        //name, move below findSourceFile
+        function bar(file: SourceFile, fileName: string, path: Path, isDefaultLib: boolean, refFile?: SourceFile, refPos?: number, refEnd?: number) {
+            sourceFilesFoundSearchingNodeModules[path] = (currentNodeModulesDepth > 0);
+            //This sets file.path to the *realpath*
+            file.path = path;
+
+            if (host.useCaseSensitiveFileNames()) {
+                // for case-sensitive file systems check if we've already seen some file with similar filename ignoring case
+                const existingFile = filesByNameIgnoreCase.get(path);
+                if (existingFile) {
+                    reportFileNamesDifferOnlyInCasingError(fileName, existingFile.fileName, refFile, refPos, refEnd);
+                }
+                else {
+                    filesByNameIgnoreCase.set(path, file);
+                }
+            }
+
+            skipDefaultLib = skipDefaultLib || file.hasNoDefaultLib;
+
+            if (!options.noResolve) {
+                processReferencedFiles(file, isDefaultLib);
+                processTypeReferenceDirectives(file);
+            }
+
+            // always process imported modules to record module name resolutions
+            processImportedModules(file);
+
+            if (isDefaultLib) {
+                files.unshift(file);
+            }
+            else {
+                files.push(file);
+            }
+        }
+
+        // Get source file from normalized fileName
+        //!!!
+        //fileName is a relative path, thus not a realpath.
+        //does getCanonicalFileName need to be an input?
+        function findSourceFile(fileName: string, currentDirectory: string, getCanonicalFileName: (fileName: string) => string, isDefaultLib: boolean, refFile?: SourceFile, refPos?: number, refEnd?: number): SourceFile {
+            const path = realpath(toPath(fileName, currentDirectory, getCanonicalFileName));
+            let fileFromFiles = filesByName.get(path);
+            //This might be a symlink.
+            //if (!fileFromFiles) {
+            //    const real = host.realpath(path) as Path; //TODO: shouldn't need cast...
+            //    if (real !== path) {
+            //        fileFromFiles = filesByName.get(real);
+            //        if (fileFromFiles) {
+            //        }
+            //    }
+            //}
+
+            if (fileFromFiles) {
+                return foo(fileFromFiles, fileName, isDefaultLib, refFile, refPos, refEnd);
             }
 
             // We haven't looked for this file, do so now and cache result
@@ -1183,36 +1245,7 @@ namespace ts {
 
             filesByName.set(path, file);
             if (file) {
-                sourceFilesFoundSearchingNodeModules[path] = (currentNodeModulesDepth > 0);
-                file.path = path;
-
-                if (host.useCaseSensitiveFileNames()) {
-                    // for case-sensitive file systems check if we've already seen some file with similar filename ignoring case
-                    const existingFile = filesByNameIgnoreCase.get(path);
-                    if (existingFile) {
-                        reportFileNamesDifferOnlyInCasingError(fileName, existingFile.fileName, refFile, refPos, refEnd);
-                    }
-                    else {
-                        filesByNameIgnoreCase.set(path, file);
-                    }
-                }
-
-                skipDefaultLib = skipDefaultLib || file.hasNoDefaultLib;
-
-                if (!options.noResolve) {
-                    processReferencedFiles(file, isDefaultLib);
-                    processTypeReferenceDirectives(file);
-                }
-
-                // always process imported modules to record module name resolutions
-                processImportedModules(file);
-
-                if (isDefaultLib) {
-                    files.unshift(file);
-                }
-                else {
-                    files.push(file);
-                }
+                bar(file, fileName, path, isDefaultLib, refFile, refPos, refEnd);
             }
 
             return file;
@@ -1305,7 +1338,7 @@ namespace ts {
                 const moduleNames = map(concatenate(file.imports, file.moduleAugmentations), getTextOfLiteral);
                 const resolutions = resolveModuleNamesWorker(moduleNames, getNormalizedAbsolutePath(file.fileName, currentDirectory));
                 Debug.assert(resolutions.length === moduleNames.length);
-                for (let i = 0; i < moduleNames.length; i++) {
+                for (let i = 0; i < moduleNames.length; i++) { //zipWith
                     const resolution = resolutions[i];
                     setResolvedModule(file, moduleNames[i], resolution);
 
@@ -1335,9 +1368,8 @@ namespace ts {
                         modulesWithElidedImports[file.path] = true;
                     }
                     else if (shouldAddFile) {
-                        const path = toPath(resolvedFileName, currentDirectory, getCanonicalFileName);
                         const pos = skipTrivia(file.text, file.imports[i].pos);
-                        findSourceFile(resolvedFileName, path, /*isDefaultLib*/ false, file, pos, file.imports[i].end);
+                        findSourceFile(resolvedFileName, currentDirectory, getCanonicalFileName, /*isDefaultLib*/ false, file, pos, file.imports[i].end);
                     }
 
                     if (isFromNodeModulesSearch) {
@@ -1551,8 +1583,9 @@ namespace ts {
             function verifyEmitFilePath(emitFileName: string, emitFilesSeen: FileMap<boolean>) {
                 if (emitFileName) {
                     const emitFilePath = toPath(emitFileName, currentDirectory, getCanonicalFileName);
+                    const emitRealPath =  realpathSafe(emitFilePath);
                     // Report error if the output overwrites input file
-                    if (filesByName.contains(emitFilePath)) {
+                    if (emitRealPath !== undefined && filesByName.contains(emitRealPath)) {
                         createEmitBlockingDiagnostics(emitFileName, Diagnostics.Cannot_write_file_0_because_it_would_overwrite_input_file);
                     }
 
@@ -1564,6 +1597,13 @@ namespace ts {
                     else {
                         emitFilesSeen.set(emitFilePath, true);
                     }
+                }
+            }
+
+            //PROBLEM: can't get realpath if the path doesn't exist (causes ENOENT)
+            function realpathSafe(path: Path): Path | undefined {
+                if (host.fileExists(path)) {
+                    return realpath(path);
                 }
             }
         }
