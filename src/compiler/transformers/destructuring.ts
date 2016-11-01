@@ -391,7 +391,10 @@ namespace ts {
         function emitBindingElement(target: VariableDeclaration | ParameterDeclaration | BindingElement, value: Expression) {
             // Any temporary assignments needed to emit target = value should point to target
             const initializer = visitor ? visitNode(target.initializer, visitor, isExpression) : target.initializer;
-            if (initializer) {
+            if (transformRest) {
+                value = value || initializer;
+            }
+            else if (initializer) {
                 // Combine value and initializer
                 value = value ? createDefaultValueCheck(value, initializer, target) : initializer;
             }

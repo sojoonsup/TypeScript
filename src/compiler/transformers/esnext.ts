@@ -256,9 +256,9 @@ namespace ts {
         function isRestBindingPattern(initializer: ForInitializer) {
             if (isVariableDeclarationList(initializer)) {
                 const declaration = firstOrUndefined(initializer.declarations);
-                if (declaration && isBindingPattern(declaration.name)) {
-                    return !!(declaration.name.transformFlags & TransformFlags.ContainsSpreadExpression);
-                }
+                return declaration && declaration.name &&
+                    declaration.name.kind === SyntaxKind.ObjectBindingPattern &&
+                    !!(declaration.name.transformFlags & TransformFlags.ContainsSpreadExpression);
             }
             return false;
         }
@@ -280,7 +280,7 @@ namespace ts {
                         getGeneratedNameForNode(node),
                         /*questionToken*/ undefined,
                         /*type*/ undefined,
-                        /*initializer*/ undefined,
+                        node.initializer,
                         /*location*/ node
                     ),
                     /*original*/ node
@@ -456,16 +456,14 @@ namespace ts {
             }
 
             for (const parameter of node.parameters) {
-                const { name, initializer, dotDotDotToken } = parameter;
-
                 // A rest parameter cannot have a binding pattern or an initializer,
                 // so let's just ignore it.
-                if (dotDotDotToken) {
+                if (parameter.dotDotDotToken) {
                     continue;
                 }
 
-                if (isBindingPattern(name)) {
-                    addDefaultValueAssignmentForBindingPattern(statements, parameter, name, initializer);
+                if (isBindingPattern(parameter.name)) {
+                    addDefaultValueAssignmentForBindingPattern(statements, parameter);
                 }
             }
         }
@@ -475,22 +473,20 @@ namespace ts {
          *
          * @param statements The statements for the new function body.
          * @param parameter The parameter for the function.
-         * @param name The name of the parameter.
-         * @param initializer The initializer for the parameter.
          */
-        function addDefaultValueAssignmentForBindingPattern(statements: Statement[], parameter: ParameterDeclaration, name: BindingPattern, initializer: Expression): void {
+        function addDefaultValueAssignmentForBindingPattern(statements: Statement[], parameter: ParameterDeclaration): void {
             const temp = getGeneratedNameForNode(parameter);
 
             // In cases where a binding pattern is simply '[]' or '{}',
             // we usually don't want to emit a var declaration; however, in the presence
             // of an initializer, we must emit that expression to preserve side effects.
-            if (name.elements.length > 0) {
+            if ((parameter.name as BindingPattern).elements.length > 0) {
                 statements.push(
                     setEmitFlags(
                         createVariableStatement(
                             /*modifiers*/ undefined,
                             createVariableDeclarationList(
-                                // TODO: This overworks for default values
+                                // TODO: This should not emit initializers
                                 flattenParameterDestructuring(parameter, temp, visitor, /*transformRest*/ true)
                             )
                         ),
@@ -498,13 +494,13 @@ namespace ts {
                     )
                 );
             }
-            else if (initializer) {
+            else if (parameter.initializer) {
                 statements.push(
                     setEmitFlags(
                         createStatement(
                             createAssignment(
                                 temp,
-                                visitNode(initializer, visitor, isExpression)
+                                visitNode(parameter.initializer, visitor, isExpression)
                             )
                         ),
                         EmitFlags.CustomPrologue
