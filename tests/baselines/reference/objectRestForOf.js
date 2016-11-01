@@ -29,20 +29,17 @@ var __rest = (this && this.__rest) || function (s, e) {
         t[p] = s[p];
     return t;
 };
-var array;
-for (var _i = 0, array_1 = array; _i < array_1.length; _i++) {
-    var _a = array_1[_i];
-    var x = _a.x, restOf = __rest(_a, ["x"]);
+let array;
+for (var _a of array) {
+    var { x } = _a, restOf = __rest(_a, ["x"]);
     [x, restOf];
 }
-var xx;
-var rrestOff;
-for (var _b = 0, array_2 = array; _b < array_2.length; _b++) {
-    var _c = array_2[_b];
-    (xx = _c.x, _c, rrestOff = __rest(_c, ["x"]));
+let xx;
+let rrestOff;
+for (var _b of array) {
+    ({ x: xx } = _b, rrestOff = __rest(_b, ["x"]));
     [xx, rrestOff];
 }
-for (var _d = 0, _e = array.map(function (a) { return (__assign({}, a, { x: 'a string' })); }); _d < _e.length; _d++) {
-    var norest = _e[_d];
+for (const norest of array.map(a => (__assign({}, a, { x: 'a string' })))) {
     [norest.x, norest.y];
 }
