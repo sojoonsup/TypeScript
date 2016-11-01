@@ -205,7 +205,7 @@ namespace ts {
 
         const pendingAssignments: Expression[] = [];
 
-        flattenDestructuring(node, /*value*/ undefined, node, emitAssignment, emitTempVariableAssignment, emitRestAssignment, /*restOnly*/ false, visitor);
+        flattenDestructuring(node, /*value*/ undefined, node, emitAssignment, emitTempVariableAssignment, emitRestAssignment, /*transformRest*/ false, visitor);
 
         const expression = inlineExpressions(pendingAssignments);
         aggregateTransformFlags(expression);
@@ -320,7 +320,7 @@ namespace ts {
                             emitRestAssignment(es2015, value, location, target);
                             es2015 = [];
                         }
-                        let propName = <Identifier | LiteralExpression>(<PropertyAssignment>p).name;
+                        const propName = <Identifier | LiteralExpression>(<PropertyAssignment>p).name;
                         const bindingTarget = p.kind === SyntaxKind.ShorthandPropertyAssignment ? <ShorthandPropertyAssignment>p : (<PropertyAssignment>p).initializer || propName;
                         // Assignment for bindingTarget = value.propName should highlight whole property, hence use p as source map node
                         emitDestructuringAssignment(bindingTarget, createDestructuringPropertyAccess(value, propName), p);

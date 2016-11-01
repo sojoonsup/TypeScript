@@ -10,8 +10,6 @@ namespace ts {
             hoistVariableDeclaration,
         } = context;
         let currentSourceFile: SourceFile;
-        // TODO: Copy onBeforeVisitNode in es2015 to track enclosingVariableStatement
-        let enclosingVariableStatement: VariableStatement;
         return transformSourceFile;
 
         function transformSourceFile(node: SourceFile) {
@@ -125,10 +123,7 @@ namespace ts {
         function visitVariableDeclaration(node: VariableDeclaration): VisitResult<VariableDeclaration> {
             // If we are here it is because the name contains a binding pattern with a rest somewhere in it.
             if (isBindingPattern(node.name) && node.name.transformFlags & TransformFlags.AssertESNext) {
-                console.log("definitely ESnext. sure of it!");
-                const hoistTempVariables = enclosingVariableStatement && hasModifier(enclosingVariableStatement, ModifierFlags.Export);
-                const result = flattenVariableDestructuring(node, /*value*/ undefined, visitor,
-                                                            hoistTempVariables ? hoistVariableDeclaration : undefined, /*transformRest*/ true);
+                const result = flattenVariableDestructuring(node, /*value*/ undefined, visitor, /*recordTempVariable*/ undefined, /*transformRest*/ true);
                 return result;
             }
 
@@ -272,7 +267,7 @@ namespace ts {
             return initializer.kind === SyntaxKind.ObjectLiteralExpression &&
                 initializer.transformFlags & TransformFlags.ContainsSpreadExpression;
         }
-//////////////////////////////////////////////////////
+
         function visitParameter(node: ParameterDeclaration): ParameterDeclaration {
             if (isObjectRestParameter(node)) {
                 // Binding patterns are converted into a generated name and are
