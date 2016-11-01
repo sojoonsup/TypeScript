@@ -323,37 +323,49 @@ namespace ts {
                 value = ensureIdentifier(value, /*reuseIdentifierExpressions*/ true, location, emitTempVariableAssignment);
             }
 
-            // if restOnly, just grab the last one, emit a rest for it, then emitRestAssignment for everything else
-            if (transformRestOnly) {
-                emitRestAssignment(properties.slice(0, properties.length - 1), value, location, target);
-                // assert that the last property is a single identifier, even though it's parsed as an expression
-                const last = properties[properties.length - 1];
-                Debug.assert(last.kind === SyntaxKind.SpreadElementExpression);
-                Debug.assert((last as SpreadElementExpression).expression.kind === SyntaxKind.Identifier);
-                const id = (last as SpreadElementExpression).expression as Identifier;
-                const restCall = createRestCall(value, target.properties, target, p => {
-                    if (p.kind !== SyntaxKind.SpreadElementExpression) {
-                        const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
-                        str.pos = target.pos;
-                        str.end = target.end;
-                        // TODO: How do I get the name from a shorthand vs normal property assignment?
-                        // and it COULD be a destructuring thing. I can't remember how those get in there
-                        // (should be a DeclarationName, not a PropertyName)
-                        str.text = getTextOfPropertyName(p.name);
-                        return str;
+            let es2015: ObjectLiteralElementLike[] = [];
+            for (let i = 0; i < properties.length; i++) {
+                const p = properties[i];
+                if (p.kind === SyntaxKind.PropertyAssignment || p.kind === SyntaxKind.ShorthandPropertyAssignment) {
+                    if (!transformRest || p.transformFlags & TransformFlags.ContainsSpreadExpression) {
+                        if (es2015.length) {
+                            emitRestAssignment(es2015, value, location, target);
+                            es2015 = [];
+                        }
+                        let propName = <Identifier | LiteralExpression>(<PropertyAssignment>p).name;
+                        const bindingTarget = p.kind === SyntaxKind.ShorthandPropertyAssignment ? <ShorthandPropertyAssignment>p : (<PropertyAssignment>p).initializer || propName;
+                        // Assignment for bindingTarget = value.propName should highlight whole property, hence use p as source map node
+                        emitDestructuringAssignment(bindingTarget, createDestructuringPropertyAccess(value, propName), p);
                     }
-                });
-                emitAssignment(id, restCall, location, last);
-            }
-            else {
-                for (const p of properties) {
-                    if (p.kind === SyntaxKind.PropertyAssignment || p.kind === SyntaxKind.ShorthandPropertyAssignment) {
-                        const propName = <Identifier | LiteralExpression>(<PropertyAssignment>p).name;
-                        const target = p.kind === SyntaxKind.ShorthandPropertyAssignment ? <ShorthandPropertyAssignment>p : (<PropertyAssignment>p).initializer || propName;
-                        // Assignment for target = value.propName should highligh whole property, hence use p as source map node
-                        emitDestructuringAssignment(target, createDestructuringPropertyAccess(value, propName), p);
+                    else {
+                        es2015.push(p);
                     }
                 }
+                else if (i === properties.length - 1 && p.kind === SyntaxKind.SpreadElementExpression) {
+                    Debug.assert((p as SpreadElementExpression).expression.kind === SyntaxKind.Identifier);
+                    if (es2015.length) {
+                        emitRestAssignment(es2015, value, location, target);
+                        es2015 = [];
+                    }
+                    const propName = (p as SpreadElementExpression).expression as Identifier;
+                    const restCall = createRestCall(value, target.properties, target, p => {
+                        if (p.kind !== SyntaxKind.SpreadElementExpression) {
+                            const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
+                            str.pos = target.pos;
+                            str.end = target.end;
+                            // TODO: How do I get the name from a shorthand vs normal property assignment?
+                            // and it COULD be a destructuring thing. I can't remember how those get in there
+                            // (should be a DeclarationName, not a PropertyName)
+                            str.text = getTextOfPropertyName(p.name);
+                            return str;
+                        }
+                    });
+                    emitDestructuringAssignment(propName, restCall, p);
+                }
+            }
+            if (es2015.length) {
+                emitRestAssignment(es2015, value, location, target);
+                es2015 = [];
             }
         }
 
@@ -531,6 +543,7 @@ namespace ts {
                 for (let i = 0; i < numElements; i++) {
                     const element = elements[i];
                     if (isOmittedExpression(element) || name.kind === SyntaxKind.ArrayBindingPattern) {
+                        // TODO: Pretty sure we DO need to handle ArrayBindingPattern in there, at least bundled in with other es2015 stuff
                         continue;
                     }
 
