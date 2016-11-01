@@ -36,6 +36,7 @@ namespace ts {
                 case SyntaxKind.ForOfStatement:
                     return visitForOfStatement(<ForOfStatement>node);
                 case SyntaxKind.ObjectBindingPattern:
+                case SyntaxKind.ArrayBindingPattern:
                 // TODO: Shouldn't be doing this
                     return node;
                 default:
@@ -97,7 +98,7 @@ namespace ts {
         function visitBinaryExpression(node: BinaryExpression): Expression {
             // TODO: the predicate should also check whether it has a trailing rest (or a nested trailing rest)
             if (isDestructuringAssignment(node) && find((node.left as ObjectLiteralExpression).properties, p => p.kind === SyntaxKind.SpreadElementExpression)) {
-                return flattenDestructuringAssignment(context, node, /*needsDestructuringValue*/ true, hoistVariableDeclaration, visitor, /*transformRest*/ true, /*transformRestOnly*/ true);
+                return flattenDestructuringAssignment(context, node, /*needsDestructuringValue*/ true, hoistVariableDeclaration, visitor, /*transformRest*/ true);
             }
 
             // TODO: Should visit children
@@ -116,18 +117,8 @@ namespace ts {
             if (isBindingPattern(node.name) && node.name.transformFlags & TransformFlags.AssertESNext) {
                 console.log("definitely ESnext. sure of it!");
                 const hoistTempVariables = enclosingVariableStatement && hasModifier(enclosingVariableStatement, ModifierFlags.Export);
-                // Look for a ... somewhere in the tree. If 
-                const toplevelRest = find(node.name.elements, e => e.kind === SyntaxKind.BindingElement && !!e.dotDotDotToken);
-                let nestedRest = false;
-                visitEachChild(node, child => {
-                    if (child.parent !== node && child.kind === SyntaxKind.BindingElement && (child as BindingElement).dotDotDotToken) {
-                        nestedRest = true;
-                    }
-                    return child;
-                }, context);
-                const restOnly = toplevelRest && !nestedRest;
                 const result = flattenVariableDestructuring(node, /*value*/ undefined, visitor,
-                                                            hoistTempVariables ? hoistVariableDeclaration : undefined, /*transformRest*/ true, restOnly);
+                                                            hoistTempVariables ? hoistVariableDeclaration : undefined, /*transformRest*/ true);
                 // result should have one or two items in its declaration list:
                 // 1 if there was only a rest, in which case we are done
                 // 2 if there was a rest plus some other fields, in which case we need to check visit the other fields
@@ -195,7 +186,6 @@ namespace ts {
                     visitor,
                     /*recordTempVariable*/ undefined,
                     /*transformRest*/ true,
-                    /*restOnly*/ true // TODO: Need to check for patterns recursively :(
                 );
 
                 const declarationList = createVariableDeclarationList(declarations, /*location*/ initializer);
