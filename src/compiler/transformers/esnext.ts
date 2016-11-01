@@ -5,6 +5,7 @@
 namespace ts {
     export function transformESNext(context: TransformationContext) {
         const { hoistVariableDeclaration } = context;
+        // TODO: Copy onBeforeVisitNode in es2015 to track enclosingVariableStatement
         let enclosingVariableStatement: VariableStatement;
         return transformSourceFile;
 
@@ -35,6 +36,7 @@ namespace ts {
                 case SyntaxKind.ForOfStatement:
                     return visitForOfStatement(<ForOfStatement>node);
                 case SyntaxKind.ObjectBindingPattern:
+                // TODO: Shouldn't be doing this
                     return node;
                 default:
                     Debug.failBadSyntaxKind(node);
