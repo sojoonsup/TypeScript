@@ -17,6 +17,15 @@ namespace ts {
                 dir = getDirectoryPath(dir);
             } while (dir !== previous);
         }
+
+        //neater
+        const mySetImmediate = typeof setImmediate !== "undefined"
+            ? setImmediate
+            : (action: () => void) => setTimeout(action, 0);
+        const myClearImmediate = typeof clearImmediate !== "undefined"
+            ? clearImmediate
+            : clearTimeout
+
         return {
             args: <string[]>[],
             newLine: "\r\n",
@@ -38,12 +47,8 @@ namespace ts {
                 return existingDirectories[path] || false;
             },
             createDirectory: noop,
-            getExecutingFilePath: (): string => {
-                return "";
-            },
-            getCurrentDirectory: (): string => {
-                return "";
-            },
+            getExecutingFilePath: () => "",
+            getCurrentDirectory: () => "",
             getDirectories: () => [],
             getEnvironmentVariable: () => "",
             readDirectory: (_path: string, _extension?: string[], _exclude?: string[], _include?: string[]): string[] => {
@@ -58,8 +63,8 @@ namespace ts {
             }),
             setTimeout,
             clearTimeout,
-            setImmediate,
-            clearImmediate
+            setImmediate: mySetImmediate,
+            clearImmediate: myClearImmediate
         };
     }
 
@@ -109,7 +114,7 @@ namespace ts {
             const originalFileExists = serverHost.fileExists;
             {
                 // patch fileExists to make sure that disk is not touched
-                serverHost.fileExists = notImplemented;
+                serverHost.fileExists = () => { throw new Error("Don't you dare!") };//notImplemented;
 
                 const newContent = `import {x} from "f1"
                 var x: string = 1;`;

@@ -1060,7 +1060,6 @@ namespace Harness {
                             }
                         }
                     });
-                    if (!false) throw new Error("TODO: Is this used?");
                     return result;
                 }
             };

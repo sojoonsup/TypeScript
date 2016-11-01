@@ -1583,7 +1583,9 @@ namespace ts {
             function verifyEmitFilePath(emitFileName: string, emitFilesSeen: FileMap<boolean>) {
                 if (emitFileName) {
                     const emitFilePath = toPath(emitFileName, currentDirectory, getCanonicalFileName);
-                    const emitRealPath =  realpathSafe(emitFilePath);
+                    const emitRealPath = emitFilePath; //realpathSafe(emitFilePath);
+                    //Don't want to call realpath here because we have a test (cachingInServerLSHost.ts "works using legacy resolution logic") that asserts that fileExists is never called.
+                    //PROBLEM: what if we would emit twice to the same location?
                     // Report error if the output overwrites input file
                     if (emitRealPath !== undefined && filesByName.contains(emitRealPath)) {
                         createEmitBlockingDiagnostics(emitFileName, Diagnostics.Cannot_write_file_0_because_it_would_overwrite_input_file);
@@ -1601,11 +1603,12 @@ namespace ts {
             }
 
             //PROBLEM: can't get realpath if the path doesn't exist (causes ENOENT)
-            function realpathSafe(path: Path): Path | undefined {
-                if (host.fileExists(path)) {
-                    return realpath(path);
-                }
-            }
+            //REal problem: don't want to call realpath
+            //function realpathSafe(path: Path): Path | undefined {
+            //    if (host.fileExists(path)) {
+            //        return realpath(path);
+            //    }
+            //}
         }
 
         function createEmitBlockingDiagnostics(emitFileName: string, message: DiagnosticMessage) {
