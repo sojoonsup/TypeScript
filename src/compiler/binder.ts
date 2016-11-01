@@ -2577,6 +2577,11 @@ namespace ts {
             transformFlags |= TransformFlags.AssertTypeScript | TransformFlags.ContainsParameterPropertyAssignments;
         }
 
+        // parameters with object rest destructuring are ES Next syntax
+        if (subtreeFlags & TransformFlags.ContainsSpreadExpression) {
+            transformFlags |= TransformFlags.AssertESNext;
+        }
+
         // If a parameter has an initializer, a binding pattern or a dotDotDot token, then
         // it is ES6 syntax and its container must emit default value assignments or parameter destructuring downlevel.
         if (subtreeFlags & TransformFlags.ContainsBindingPattern || initializer || dotDotDotToken) {
@@ -2810,6 +2815,11 @@ namespace ts {
                 transformFlags |= TransformFlags.AssertES2017;
             }
 
+            // function declarations with object rest destructuring are ES Next syntax
+            if (subtreeFlags & TransformFlags.ContainsSpreadExpression) {
+                transformFlags |= TransformFlags.AssertESNext;
+            }
+
             // If a FunctionDeclaration's subtree has marked the container as needing to capture the
             // lexical this, or the function contains parameters with initializers, then this node is
             // ES6 syntax.
@@ -2847,6 +2857,12 @@ namespace ts {
             transformFlags |= TransformFlags.AssertES2017;
         }
 
+        // function expressions with object rest destructuring are ES Next syntax
+        if (subtreeFlags & TransformFlags.ContainsSpreadExpression) {
+            transformFlags |= TransformFlags.AssertESNext;
+        }
+
+
         // If a FunctionExpression's subtree has marked the container as needing to capture the
         // lexical this, or the function contains parameters with initializers, then this node is
         // ES6 syntax.
@@ -2882,6 +2898,11 @@ namespace ts {
         // An async arrow function is ES2017 syntax.
         if (hasModifier(node, ModifierFlags.Async)) {
             transformFlags |= TransformFlags.AssertES2017;
+        }
+
+        // arrow functions with object rest destructuring are ES Next syntax
+        if (subtreeFlags & TransformFlags.ContainsSpreadExpression) {
+            transformFlags |= TransformFlags.AssertESNext;
         }
 
         // If an ArrowFunction contains a lexical this, its container must capture the lexical this.

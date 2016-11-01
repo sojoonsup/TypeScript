@@ -94,14 +94,15 @@ namespace ts {
     export function flattenParameterDestructuring(
         node: ParameterDeclaration,
         value: Expression,
-        visitor?: (node: Node) => VisitResult<Node>) {
+        visitor?: (node: Node) => VisitResult<Node>,
+        transformRest?: boolean) {
         const declarations: VariableDeclaration[] = [];
 
         // TODO: Using restOnly === false is cheating and relying on the ES2015 transform to do it for us, after
         // ES2015 has already transformed the parameter to a variable declaration.
         // The ESNext transform needs to do this itself.
         // Lots of duplicated code between the two though.
-        flattenDestructuring(node, value, node, emitAssignment, emitTempVariableAssignment, emitRestAssignment, /*transformRest*/ false, visitor);
+        flattenDestructuring(node, value, node, emitAssignment, emitTempVariableAssignment, emitRestAssignment, transformRest, visitor);
 
         return declarations;
 

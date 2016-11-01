@@ -4,12 +4,18 @@
 /*@internal*/
 namespace ts {
     export function transformESNext(context: TransformationContext) {
-        const { hoistVariableDeclaration } = context;
+        const {
+            startLexicalEnvironment,
+            endLexicalEnvironment,
+            hoistVariableDeclaration,
+        } = context;
+        let currentSourceFile: SourceFile;
         // TODO: Copy onBeforeVisitNode in es2015 to track enclosingVariableStatement
         let enclosingVariableStatement: VariableStatement;
         return transformSourceFile;
 
         function transformSourceFile(node: SourceFile) {
+            currentSourceFile = node;
             return visitEachChild(node, visitor, context);
         }
 
@@ -30,15 +36,23 @@ namespace ts {
                 case SyntaxKind.ObjectLiteralExpression:
                     return visitObjectLiteralExpression(node as ObjectLiteralExpression);
                 case SyntaxKind.BinaryExpression:
-                    return visitBinaryExpression(<BinaryExpression>node);
+                    return visitBinaryExpression(node as BinaryExpression);
                 case SyntaxKind.VariableDeclaration:
-                    return visitVariableDeclaration(<VariableDeclaration>node);
+                    return visitVariableDeclaration(node as VariableDeclaration);
                 case SyntaxKind.ForOfStatement:
-                    return visitForOfStatement(<ForOfStatement>node);
+                    return visitForOfStatement(node as ForOfStatement);
                 case SyntaxKind.ObjectBindingPattern:
                 case SyntaxKind.ArrayBindingPattern:
-                // TODO: Shouldn't be doing this
+                    // TODO: Shouldn't be doing this
                     return node;
+                case SyntaxKind.FunctionDeclaration:
+                    return visitFunctionDeclaration(node as FunctionDeclaration);
+                case SyntaxKind.FunctionExpression:
+                    return visitFunctionExpression(node as FunctionExpression);
+                case SyntaxKind.ArrowFunction:
+                    return visitArrowFunction(node as ArrowFunction);
+                case SyntaxKind.Parameter:
+                    return visitParameter(node as ParameterDeclaration);
                 default:
                     Debug.failBadSyntaxKind(node);
                     return visitEachChild(node, visitor, context);
@@ -243,6 +257,7 @@ namespace ts {
             return forStatement;
         }
 
+
         function isRestBindingPattern(initializer: ForInitializer) {
             if (isVariableDeclarationList(initializer)) {
                 const declaration = firstOrUndefined(initializer.declarations);
@@ -256,6 +271,251 @@ namespace ts {
         function isRestAssignment(initializer: ForInitializer) {
             return initializer.kind === SyntaxKind.ObjectLiteralExpression &&
                 initializer.transformFlags & TransformFlags.ContainsSpreadExpression;
+        }
+//////////////////////////////////////////////////////
+        function visitParameter(node: ParameterDeclaration): ParameterDeclaration {
+            if (isObjectRestParameter(node)) {
+                // Binding patterns are converted into a generated name and are
+                // evaluated inside the function body.
+                return setOriginalNode(
+                    createParameter(
+                        /*decorators*/ undefined,
+                        /*modifiers*/ undefined,
+                        /*dotDotDotToken*/ undefined,
+                        getGeneratedNameForNode(node),
+                        /*questionToken*/ undefined,
+                        /*type*/ undefined,
+                        /*initializer*/ undefined,
+                        /*location*/ node
+                    ),
+                    /*original*/ node
+                );
+            }
+            else {
+                return node;
+            }
+        }
+
+        function isObjectRestParameter(node: ParameterDeclaration) {
+            return node.name &&
+                node.name.kind === SyntaxKind.ObjectBindingPattern &&
+                !!(node.name.transformFlags & TransformFlags.ContainsSpreadExpression);
+        }
+
+        function visitFunctionDeclaration(node: FunctionDeclaration): FunctionDeclaration {
+            return setOriginalNode(
+                createFunctionDeclaration(
+                    /*decorators*/ undefined,
+                    node.modifiers,
+                    node.asteriskToken,
+                    node.name,
+                    /*typeParameters*/ undefined,
+                    visitNodes(node.parameters, visitor, isParameter),
+                    /*type*/ undefined,
+                    transformFunctionBody(node) as Block,
+                    /*location*/ node
+                ),
+                /*original*/ node);
+        }
+
+        function visitArrowFunction(node: ArrowFunction) {
+            const func = setOriginalNode(
+                createArrowFunction(
+                    /*modifiers*/ undefined,
+                    /*typeParameters*/ undefined,
+                    visitNodes(node.parameters, visitor, isParameter),
+                    /*type*/ undefined,
+                    node.equalsGreaterThanToken,
+                    transformFunctionBody(node),
+                    /*location*/ node
+                ),
+                /*original*/ node
+            );
+            setEmitFlags(func, EmitFlags.CapturesThis);
+            return func;
+        }
+
+        function visitFunctionExpression(node: FunctionExpression): Expression {
+            return setOriginalNode(
+                createFunctionExpression(
+                    /*modifiers*/ undefined,
+                    node.asteriskToken,
+                    name,
+                    /*typeParameters*/ undefined,
+                    visitNodes(node.parameters, visitor, isParameter),
+                    /*type*/ undefined,
+                    transformFunctionBody(node) as Block,
+                    /*location*/ node
+                ),
+                /*original*/ node
+            );
+        }
+
+        /**
+         * Transforms the body of a function-like node.
+         *
+         * @param node A function-like node.
+         */
+        function transformFunctionBody(node: FunctionLikeDeclaration): Block | Expression {
+            const hasRest = forEach(node.parameters, isObjectRestParameter);
+            if (!hasRest) {
+                return visitEachChild(node.body, visitor, context);
+            }
+
+            let multiLine = false; // indicates whether the block *must* be emitted as multiple lines
+            let singleLine = false; // indicates whether the block *may* be emitted as a single line
+            let statementsLocation: TextRange;
+            let closeBraceLocation: TextRange;
+
+            const statements: Statement[] = [];
+            const body = node.body;
+            let statementOffset: number;
+
+            startLexicalEnvironment();
+            if (isBlock(body)) {
+                // ensureUseStrict is false because no new prologue-directive should be added.
+                // addPrologueDirectives will simply put already-existing directives at the beginning of the target statement-array
+                statementOffset = addPrologueDirectives(statements, body.statements, /*ensureUseStrict*/ false, visitor);
+            }
+
+            addDefaultValueAssignmentsIfNeeded(statements, node);
+
+            // If we added any generated statements, this must be a multi-line block.
+            if (!multiLine && statements.length > 0) {
+                multiLine = true;
+            }
+
+            if (isBlock(body)) {
+                statementsLocation = body.statements;
+                addRange(statements, visitNodes(body.statements, visitor, isStatement, statementOffset));
+
+                // If the original body was a multi-line block, this must be a multi-line block.
+                if (!multiLine && body.multiLine) {
+                    multiLine = true;
+                }
+            }
+            else {
+                Debug.assert(node.kind === SyntaxKind.ArrowFunction);
+
+                // To align with the old emitter, we use a synthetic end position on the location
+                // for the statement list we synthesize when we down-level an arrow function with
+                // an expression function body. This prevents both comments and source maps from
+                // being emitted for the end position only.
+                statementsLocation = moveRangeEnd(body, -1);
+
+                const equalsGreaterThanToken = (<ArrowFunction>node).equalsGreaterThanToken;
+                if (!nodeIsSynthesized(equalsGreaterThanToken) && !nodeIsSynthesized(body)) {
+                    if (rangeEndIsOnSameLineAsRangeStart(equalsGreaterThanToken, body, currentSourceFile)) {
+                        singleLine = true;
+                    }
+                    else {
+                        multiLine = true;
+                    }
+                }
+
+                const expression = visitNode(body, visitor, isExpression);
+                const returnStatement = createReturn(expression, /*location*/ body);
+                setEmitFlags(returnStatement, EmitFlags.NoTokenSourceMaps | EmitFlags.NoTrailingSourceMap | EmitFlags.NoTrailingComments);
+                statements.push(returnStatement);
+
+                // To align with the source map emit for the old emitter, we set a custom
+                // source map location for the close brace.
+                closeBraceLocation = body;
+            }
+
+            const lexicalEnvironment = endLexicalEnvironment();
+            addRange(statements, lexicalEnvironment);
+
+            // If we added any final generated statements, this must be a multi-line block
+            if (!multiLine && lexicalEnvironment && lexicalEnvironment.length) {
+                multiLine = true;
+            }
+
+            const block = createBlock(createNodeArray(statements, statementsLocation), node.body, multiLine);
+            if (!multiLine && singleLine) {
+                setEmitFlags(block, EmitFlags.SingleLine);
+            }
+
+            if (closeBraceLocation) {
+                setTokenSourceMapRange(block, SyntaxKind.CloseBraceToken, closeBraceLocation);
+            }
+
+            setOriginalNode(block, node.body);
+            return block;
+        }
+
+        function shouldAddDefaultValueAssignments(node: FunctionLikeDeclaration): boolean {
+            return !!(node.transformFlags & TransformFlags.ContainsDefaultValueAssignments);
+        }
+
+        /**
+         * Adds statements to the body of a function-like node if it contains parameters with
+         * binding patterns or initializers.
+         *
+         * @param statements The statements for the new function body.
+         * @param node A function-like node.
+         */
+        function addDefaultValueAssignmentsIfNeeded(statements: Statement[], node: FunctionLikeDeclaration): void {
+            if (!shouldAddDefaultValueAssignments(node)) {
+                return;
+            }
+
+            for (const parameter of node.parameters) {
+                const { name, initializer, dotDotDotToken } = parameter;
+
+                // A rest parameter cannot have a binding pattern or an initializer,
+                // so let's just ignore it.
+                if (dotDotDotToken) {
+                    continue;
+                }
+
+                if (isBindingPattern(name)) {
+                    addDefaultValueAssignmentForBindingPattern(statements, parameter, name, initializer);
+                }
+            }
+        }
+
+        /**
+         * Adds statements to the body of a function-like node for parameters with binding patterns
+         *
+         * @param statements The statements for the new function body.
+         * @param parameter The parameter for the function.
+         * @param name The name of the parameter.
+         * @param initializer The initializer for the parameter.
+         */
+        function addDefaultValueAssignmentForBindingPattern(statements: Statement[], parameter: ParameterDeclaration, name: BindingPattern, initializer: Expression): void {
+            const temp = getGeneratedNameForNode(parameter);
+
+            // In cases where a binding pattern is simply '[]' or '{}',
+            // we usually don't want to emit a var declaration; however, in the presence
+            // of an initializer, we must emit that expression to preserve side effects.
+            if (name.elements.length > 0) {
+                statements.push(
+                    setEmitFlags(
+                        createVariableStatement(
+                            /*modifiers*/ undefined,
+                            createVariableDeclarationList(
+                                // TODO: This overworks for default values
+                                flattenParameterDestructuring(parameter, temp, visitor, /*transformRest*/ true)
+                            )
+                        ),
+                        EmitFlags.CustomPrologue
+                    )
+                );
+            }
+            else if (initializer) {
+                statements.push(
+                    setEmitFlags(
+                        createStatement(
+                            createAssignment(
+                                temp,
+                                visitNode(initializer, visitor, isExpression)
+                            )
+                        ),
+                        EmitFlags.CustomPrologue
+                    )
+                );
+            }
         }
     }
 }
