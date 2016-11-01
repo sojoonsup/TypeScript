@@ -89,9 +89,10 @@ var { x: { ka, ...nested }, y: other, ...rest } = complex;
 >rest : Symbol(rest, Decl(objectRest.ts, 16, 37))
 >complex : Symbol(complex, Decl(objectRest.ts, 15, 3))
 
-({x: { ka, ...nested }, y, ...rest} = complex);
+({x: { ka, ...nested }, y: other, ...rest} = complex);
 >x : Symbol(x, Decl(objectRest.ts, 17, 2))
 >ka : Symbol(ka, Decl(objectRest.ts, 17, 6))
 >y : Symbol(y, Decl(objectRest.ts, 17, 23))
+>other : Symbol(other, Decl(objectRest.ts, 16, 27))
 >complex : Symbol(complex, Decl(objectRest.ts, 15, 3))
 

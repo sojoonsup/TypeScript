@@ -10,24 +10,13 @@ var { b: { '0': n, '1': oooo }, ...justA } = o;
 
 let o2 = { c: 'terrible idea?', d: 'yes' };
 var { d: renamed, ...d } = o2;
-function cloneAgain({ a, ...clone }: { a: number, b: string }): void {
-}
-let array: { x: number, y: string }[];
-for (let { x, ...restOf } of array) {
-    [x, restOf];
-}
-let xx: number;
-let rrestOff: { y: string };
-for ({ x: xx, ...rrestOff } of array ) {
-    [xx, rrestOff];
-}
-for (const norest of array.map(a => ({ ...a, x: 'a string' }))) {
-    [norest.x, norest.y];
-    // x is now a string. who knows why.
-}
-declare function suddenly(f: (a: { x: { z, ka }, y: string }) => void);
-suddenly(({ x: a, ...rest }) => rest.y);
-suddenly(({ x: { z, ...nested }, ...rest }) => rest.y + nested.ka);
+
+let nestedrest: { x: number, n1: { y: number, n2: { z: number, n3: { n4: number } } }, rest: number, restrest: number };
+var { x, n1: { y, n2: { z, n3: { ...nr } } }, ...restrest } = nestedrest;
+
+let complex: { x: { ka, ki }, y: number };
+var { x: { ka, ...nested }, y: other, ...rest } = complex;
+({x: { ka, ...nested }, y: other, ...rest} = complex);
 
 
 //// [objectRest.js]
@@ -45,40 +34,18 @@ var __rest = (this && this.__rest) || function (s, e) {
         t[p] = s[p];
     return t;
 };
-var o = { a: 1, b: 'no' };
+let o = { a: 1, b: 'no' };
 var clone = __rest(o, []);
-var a = o.a, justB = __rest(o, ["a"]);
-var a = o.a, renamed = o.b, empty = __rest(o, ["a", "b"]);
-var _a = 'b', renamed = o[_a], justA = __rest(o, ["b"]);
-var renamed = o["b"], justA = __rest(o, ["b"]);
-var _b = o.b, n = _b["0"], oooo = _b["1"], justA = __rest(o, ["b"]);
-var o2 = { c: 'terrible idea?', d: 'yes' };
-var renamed = o2.d, d = __rest(o2, ["d"]);
-function cloneAgain(_a) {
-    var a = _a.a, clone = __rest(_a, ["a"]);
-}
-var array;
-for (var _i = 0, array_1 = array; _i < array_1.length; _i++) {
-    var _c = array_1[_i];
-    var x = _c.x, restOf = __rest(_c, ["x"]);
-    [x, restOf];
-}
-var xx;
-var rrestOff;
-for (var _d = 0, array_2 = array; _d < array_2.length; _d++) {
-    var _e = array_2[_d];
-    (xx = _e.x, _e, rrestOff = __rest(_e, ["x"]));
-    [xx, rrestOff];
-}
-for (var _f = 0, _g = array.map(function (a) { return (__assign({}, a, { x: 'a string' })); }); _f < _g.length; _f++) {
-    var norest = _g[_f];
-    [norest.x, norest.y];
-}
-suddenly(function (_a) {
-    var a = _a.x, rest = __rest(_a, ["x"]);
-    return rest.y;
-});
-suddenly(function (_a) {
-    var _b = _a.x, z = _b.z, nested = __rest(_b, ["z"]), rest = __rest(_a, ["x"]);
-    return rest.y + nested.ka;
-});
+var { a } = o, justB = __rest(o, ["a"]);
+var { a, b: renamed } = o, empty = __rest(o, ["a", "b"]);
+var { ['b']: renamed } = o, justA = __rest(o, ["b"]);
+var { 'b': renamed } = o, justA = __rest(o, ["b"]);
+var { b: { '0': n, '1': oooo } } = o, justA = __rest(o, ["b"]);
+let o2 = { c: 'terrible idea?', d: 'yes' };
+var { d: renamed } = o2, d = __rest(o2, ["d"]);
+let nestedrest;
+var { x } = nestedrest, _a = nestedrest.n1, { y } = _a, _b = _a.n2, { z } = _b, nr = __rest(_b.n3, []), restrest = __rest(nestedrest, ["x", "n1"]);
+let complex;
+var _c = complex.x, { ka } = _c, nested = __rest(_c, ["ka"]), { y: other } = complex, rest = __rest(complex, ["x", "y"]);
+(_d = complex.x, { ka } = _d, nested = __rest(_d, ["ka"]), { y: other } = complex, rest = __rest(complex, ["x", "y"]), complex);
+var _d;

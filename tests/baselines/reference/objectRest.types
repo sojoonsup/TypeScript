@@ -95,15 +95,16 @@ var { x: { ka, ...nested }, y: other, ...rest } = complex;
 >rest : {}
 >complex : { x: { ka: any; ki: any; }; y: number; }
 
-({x: { ka, ...nested }, y, ...rest} = complex);
->({x: { ka, ...nested }, y, ...rest} = complex) : { x: { ka: any; ki: any; }; y: number; }
->{x: { ka, ...nested }, y, ...rest} = complex : { x: { ka: any; ki: any; }; y: number; }
->{x: { ka, ...nested }, y, ...rest} : { x: { ki: any; ka: any; }; y: number; }
+({x: { ka, ...nested }, y: other, ...rest} = complex);
+>({x: { ka, ...nested }, y: other, ...rest} = complex) : { x: { ka: any; ki: any; }; y: number; }
+>{x: { ka, ...nested }, y: other, ...rest} = complex : { x: { ka: any; ki: any; }; y: number; }
+>{x: { ka, ...nested }, y: other, ...rest} : { x: { ki: any; ka: any; }; y: number; }
 >x : { ki: any; ka: any; }
 >{ ka, ...nested } : { ki: any; ka: any; }
 >ka : any
 >nested : any
 >y : number
+>other : number
 >rest : any
 >complex : { x: { ka: any; ki: any; }; y: number; }
 
