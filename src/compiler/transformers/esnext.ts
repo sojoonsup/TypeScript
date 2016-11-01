@@ -96,13 +96,11 @@ namespace ts {
          * @param node A BinaryExpression node.
          */
         function visitBinaryExpression(node: BinaryExpression): Expression {
-            // TODO: the predicate should also check whether it has a trailing rest (or a nested trailing rest)
-            if (isDestructuringAssignment(node) && find((node.left as ObjectLiteralExpression).properties, p => p.kind === SyntaxKind.SpreadElementExpression)) {
+            if (isDestructuringAssignment(node) && node.left.transformFlags & TransformFlags.AssertESNext) {
                 return flattenDestructuringAssignment(context, node, /*needsDestructuringValue*/ true, hoistVariableDeclaration, visitor, /*transformRest*/ true);
             }
 
-            // TODO: Should visit children
-            return node;
+            return visitEachChild(node, visitor, context);
         }
 
         /**
@@ -111,26 +109,12 @@ namespace ts {
          * @param node A VariableDeclaration node.
          */
         function visitVariableDeclaration(node: VariableDeclaration): VisitResult<VariableDeclaration> {
-            // TODO: Here we now need to handle nested rests and no rests at all
-            // (I think the visit *almost* does this, except we don't call it for the top-level binding-pattern case)
-            // If we are here it is because the name contains a binding pattern.
+            // If we are here it is because the name contains a binding pattern with a rest somewhere in it.
             if (isBindingPattern(node.name) && node.name.transformFlags & TransformFlags.AssertESNext) {
                 console.log("definitely ESnext. sure of it!");
                 const hoistTempVariables = enclosingVariableStatement && hasModifier(enclosingVariableStatement, ModifierFlags.Export);
                 const result = flattenVariableDestructuring(node, /*value*/ undefined, visitor,
                                                             hoistTempVariables ? hoistVariableDeclaration : undefined, /*transformRest*/ true);
-                // result should have one or two items in its declaration list:
-                // 1 if there was only a rest, in which case we are done
-                // 2 if there was a rest plus some other fields, in which case we need to check visit the other fields
-                // TODO: The visit doesn't *handle* input with no rests. Who does that? We technically have to visit everything to make sure that
-                // { x: { y: { z: { ka: { ki: { ... rest } } } } } }
-                // works
-                //if (result.length === 1) {
-                    //return result;
-                //}
-                //else {
-                    //return [visitVariableDeclaration(result[0]), result[1]];
-                //}
                 return result;
             }
 
@@ -168,7 +152,6 @@ namespace ts {
             // where <init> is [let] variabledeclarationlist | expression
             const initializer = node.initializer;
             if (!isRestBindingPattern(initializer) && !isRestAssignment(initializer)) {
-                // TODO: Need to check for patterns recursively
                 return visitEachChild(node, visitor, context);
             }
 
@@ -216,7 +199,7 @@ namespace ts {
                             /*needsValue*/ false,
                             hoistVariableDeclaration,
                             visitor,
-                            /*restOnly*/ true
+                            /*transformRest*/ true
                         )
                     )
                 );
@@ -260,23 +243,19 @@ namespace ts {
             return forStatement;
         }
 
-        function isRestBindingPattern(initializer: ForInitializer): boolean {
+        function isRestBindingPattern(initializer: ForInitializer) {
             if (isVariableDeclarationList(initializer)) {
                 const declaration = firstOrUndefined(initializer.declarations);
                 if (declaration && isBindingPattern(declaration.name)) {
-                    const elements = (declaration.name as ObjectBindingPattern).elements;
-                    return elements.length && !!elements[elements.length - 1].dotDotDotToken;
+                    return !!(declaration.name.transformFlags & TransformFlags.ContainsSpreadExpression);
                 }
             }
             return false;
         }
 
-        function isRestAssignment(initializer: ForInitializer): boolean {
-            if (initializer.kind === SyntaxKind.ObjectLiteralExpression) {
-                const properties = (initializer as ObjectLiteralExpression).properties;
-                return properties[properties.length - 1].kind === SyntaxKind.SpreadElementExpression;
-            }
-            return false;
+        function isRestAssignment(initializer: ForInitializer) {
+            return initializer.kind === SyntaxKind.ObjectLiteralExpression &&
+                initializer.transformFlags & TransformFlags.ContainsSpreadExpression;
         }
     }
 }
