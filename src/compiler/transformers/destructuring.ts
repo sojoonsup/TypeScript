@@ -335,18 +335,7 @@ namespace ts {
                         es2015 = [];
                     }
                     const propName = (p as SpreadElementExpression).expression as Identifier;
-                    const restCall = createRestCall(value, target.properties, target, p => {
-                        if (p.kind !== SyntaxKind.SpreadElementExpression) {
-                            const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
-                            str.pos = target.pos;
-                            str.end = target.end;
-                            // TODO: How do I get the name from a shorthand vs normal property assignment?
-                            // and it COULD be a destructuring thing. I can't remember how those get in there
-                            // (should be a DeclarationName, not a PropertyName)
-                            str.text = getTextOfPropertyName(p.name);
-                            return str;
-                        }
-                    });
+                    const restCall = createRestCall(value, target.properties, p => p.name, target);
                     emitDestructuringAssignment(propName, restCall, p);
                 }
             }
@@ -382,13 +371,17 @@ namespace ts {
 
         /** Given value: o, propName: p, pattern: { a, b, ...p } from the original statement
          * `{ a, b, ...p } = o`, create `p = __rest(o, ["a", "b"]);`*/
-        function createRestCall<T extends Node>(value: Expression, elements: T[], location: TextRange, getPropertyName: (element: T) => StringLiteral): Expression {
+        function createRestCall<T extends Node>(value: Expression, elements: T[], getPropertyName: (element: T) => PropertyName, location: TextRange): Expression {
             const propertyNames: LiteralExpression[] = [];
-            for (const element of elements) {
-                const name = getPropertyName(element);
-                if (name) {
-                    propertyNames.push(name);
+            for (let i = 0; i < elements.length - 1; i++) {
+                if (isOmittedExpression(elements[i])) {
+                    continue;
                 }
+                const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
+                str.pos = location.pos;
+                str.end = location.end;
+                str.text = getTextOfPropertyName(getPropertyName(elements[i]));
+                propertyNames.push(str);
             }
             const args = createSynthesizedNodeArray([value, createArrayLiteral(propertyNames, location)]);
             return createCall(createIdentifier("__rest"), undefined, args);
@@ -411,9 +404,7 @@ namespace ts {
                 emitAssignment(name, value, target, target);
             }
             else {
-                const elements = name.elements;
-                const numElements = elements.length;
-                let es2015: BindingElement[] = [];
+                const numElements = name.elements.length;
                 if (numElements !== 1) {
                     // For anything other than a single-element destructuring we need to generate a temporary
                     // to ensure value is evaluated exactly once. Additionally, if we have zero elements
@@ -421,65 +412,71 @@ namespace ts {
                     // so in that case, we'll intentionally create that temporary.
                     value = ensureIdentifier(value, /*reuseIdentifierExpressions*/ numElements !== 0, target, emitTempVariableAssignment);
                 }
-                for (let i = 0; i < numElements; i++) {
-                    const element = elements[i];
-                    if (isOmittedExpression(element)) {
-                        continue;
-                    }
-                    else if (name.kind === SyntaxKind.ObjectBindingPattern) {
-                        if (i === numElements - 1 && element.dotDotDotToken) {
-                            if (es2015.length) {
-                                emitRestAssignment(es2015, value, target, target);
-                                es2015 = [];
-                            }
-                            const restCall = createRestCall(value, name.elements, name, element => {
-                                if (isOmittedExpression(element)) {
-                                    return;
-                                }
-                                if (!element.dotDotDotToken) {
-                                    const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
-                                    str.pos = name.pos;
-                                    str.end = name.end;
-                                    str.text = getTextOfPropertyName(element.propertyName || <Identifier>element.name);
-                                    return str;
-                                }
-                            });
-                            emitBindingElement(element, restCall);
-                        }
-                        else if (!transformRest || element.transformFlags & TransformFlags.ContainsSpreadExpression) {
-                            // TODO: Push property names into a list too. (See the stolen code below)
-                            //const str = <StringLiteral>createSynthesizedNode(SyntaxKind.StringLiteral);
-                            //str.pos = name.pos;
-                            //str.end = name.end;
-                            //str.text = getTextOfPropertyName(element.propertyName || <Identifier>element.name);
-                            //names.push(str);
-                            if (es2015.length) {
-                                emitRestAssignment(es2015, value, target, target);
-                                es2015 = [];
-                            }
-                            // Rewrite element to a declaration with an initializer that fetches property
-                            const propName = element.propertyName || <Identifier>element.name;
-                            emitBindingElement(element, createDestructuringPropertyAccess(value, propName));
-                        }
-                        else {
-                            // do not emit until we have a complete bundle of ES2015 syntax
-                            es2015.push(element);
-                        }
-                    }
-                    else {
-                        if (!element.dotDotDotToken) {
-                            // Rewrite element to a declaration that accesses array element at index i
-                            emitBindingElement(element, createElementAccess(value, i));
-                        }
-                        else if (i === numElements - 1) {
-                            emitBindingElement(element, createArraySlice(value, i));
-                        }
-                    }
+                if (name.kind === SyntaxKind.ArrayBindingPattern) {
+                    emitArrayBindingElement(name, value);
                 }
-                if (es2015.length) {
-                    emitRestAssignment(es2015, value, target, target);
-                    es2015 = [];
+                else {
+                    emitObjectBindingElement(target, value);
                 }
+            }
+        }
+
+        function emitArrayBindingElement(name: BindingPattern, value: Expression) {
+            const elements = name.elements;
+            const numElements = elements.length;
+            for (let i = 0; i < numElements; i++) {
+                const element = elements[i];
+                if (isOmittedExpression(element)) {
+                    continue;
+                }
+                if (!element.dotDotDotToken) {
+                    // Rewrite element to a declaration that accesses array element at index i
+                    emitBindingElement(element, createElementAccess(value, i));
+                }
+                else if (i === numElements - 1) {
+                    emitBindingElement(element, createArraySlice(value, i));
+                }
+            }
+        }
+
+        function emitObjectBindingElement(target: VariableDeclaration | ParameterDeclaration | BindingElement, value: Expression) {
+            const name = target.name as BindingPattern;
+            const elements = name.elements;
+            const numElements = elements.length;
+            let es2015: BindingElement[] = [];
+            for (let i = 0; i < numElements; i++) {
+                const element = elements[i];
+                if (isOmittedExpression(element)) {
+                    continue;
+                }
+                if (i === numElements - 1 && element.dotDotDotToken) {
+                    if (es2015.length) {
+                        emitRestAssignment(es2015, value, target, target);
+                        es2015 = [];
+                    }
+                    const restCall = createRestCall(value,
+                                                    name.elements,
+                                                    element => (element as BindingElement).propertyName || <Identifier>(element as BindingElement).name,
+                                                    name);
+                    emitBindingElement(element, restCall);
+                }
+                else if (!transformRest || element.transformFlags & TransformFlags.ContainsSpreadExpression) {
+                    if (es2015.length) {
+                        emitRestAssignment(es2015, value, target, target);
+                        es2015 = [];
+                    }
+                    // Rewrite element to a declaration with an initializer that fetches property
+                    const propName = element.propertyName || <Identifier>element.name;
+                    emitBindingElement(element, createDestructuringPropertyAccess(value, propName));
+                }
+                else {
+                    // do not emit until we have a complete bundle of ES2015 syntax
+                    es2015.push(element);
+                }
+            }
+            if (es2015.length) {
+                emitRestAssignment(es2015, value, target, target);
+                es2015 = [];
             }
         }
 
