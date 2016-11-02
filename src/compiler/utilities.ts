@@ -2526,16 +2526,21 @@ namespace ts {
     export function getSourceFilesToEmit(host: EmitHost, targetSourceFile?: SourceFile) {
         const options = host.getCompilerOptions();
         if (options.outFile || options.out) {
-            const moduleKind = getEmitModuleKind(options);
-            const moduleEmitEnabled = moduleKind === ModuleKind.AMD || moduleKind === ModuleKind.System;
             const sourceFiles = host.getSourceFiles();
-            // Can emit only sources that are not declaration file and are either non module code or module with --module or --target es6 specified
-            return filter(sourceFiles, moduleEmitEnabled ? isNonDeclarationFile : isBundleEmitNonExternalModule);
+            return filterSourceFilesToEmit(sourceFiles, options);
         }
         else {
             const sourceFiles = targetSourceFile === undefined ? host.getSourceFiles() : [targetSourceFile];
             return filter(sourceFiles, isNonDeclarationFile);
         }
+    }
+
+    /** Filters out the source files that will be emitted. */
+    export function filterSourceFilesToEmit(sourceFiles: SourceFile[], options: CompilerOptions): SourceFile[] {
+        const moduleKind = getEmitModuleKind(options);
+        const moduleEmitEnabled = moduleKind === ModuleKind.AMD || moduleKind === ModuleKind.System;
+        // Can emit only sources that are not declaration file and are either non module code or module with --module or --target es6 specified
+        return filter(sourceFiles, moduleEmitEnabled ? isNonDeclarationFile : isBundleEmitNonExternalModule);
     }
 
     function isNonDeclarationFile(sourceFile: SourceFile) {
