@@ -107,7 +107,8 @@ namespace ts {
 
             getJsxElementAttributesType,
             getJsxIntrinsicTagNames,
-            isOptionalParameter
+            isOptionalParameter,
+            tryFindAmbientModule: moduleName => tryFindAmbientModule(moduleName, /*withAugmentations*/ false)
         };
 
         const tupleTypes: GenericType[] = [];
@@ -1369,12 +1370,15 @@ namespace ts {
                 return;
             }
 
+            const ambientModule = tryFindAmbientModule(moduleName, /*withAugmentations*/ true);
+            if (ambientModule) {
+                return ambientModule;
+            }
             const isRelative = isExternalModuleNameRelative(moduleName);
             const quotedName = '"' + moduleName + '"';
             if (!isRelative) {
                 const symbol = getSymbol(globals, quotedName, SymbolFlags.ValueModule);
                 if (symbol) {
-                    // merged symbol is module declaration symbol combined with all augmentations
                     return getMergedSymbol(symbol);
                 }
             }
@@ -4729,6 +4733,15 @@ namespace ts {
                     }
                 }
             }
+        }
+
+        function tryFindAmbientModule(moduleName: string, withAugmentations: boolean) {
+            if (isExternalModuleNameRelative(moduleName)) {
+                return undefined;
+            }
+            const symbol = getSymbol(globals, `"${moduleName}"`, SymbolFlags.ValueModule);
+            // merged symbol is module declaration symbol combined with all augmentations
+            return symbol && withAugmentations ? getMergedSymbol(symbol) : symbol;
         }
 
         function isOptionalParameter(node: ParameterDeclaration) {
